@@ -2,7 +2,6 @@ venv/
 .env
 __pycache__/
 *.pyc
-data/pdfs/
 data/uploads/
 data/indexes/
 data/*.json

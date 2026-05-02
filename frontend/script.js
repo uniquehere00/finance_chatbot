@@ -1,6 +1,6 @@
 console.log("script.js v3 loaded");
 
-const API_URL = "http://localhost:8000";
+const API_URL = "https://web-production-bf42a.up.railway.app";
 let currentSessionId = null;
 let isProcessing = false;
 

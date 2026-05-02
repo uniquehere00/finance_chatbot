@@ -4,6 +4,7 @@ import faiss
 import numpy as np
 from typing import List, Dict, Tuple
 from sentence_transformers import SentenceTransformer
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from dotenv import load_dotenv
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))

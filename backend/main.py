@@ -24,9 +24,12 @@ app.add_middleware(
 
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-UPLOAD_DIR = Path(__file__).parent.parent / "data" / "uploads"
+
+SAMPLE_DIR = Path(__file__).parent / "data" / "pdfs"
+SAMPLE_DIR.mkdir(parents=True, exist_ok=True)
+
+UPLOAD_DIR = Path(__file__).parent / "data" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-SAMPLE_DIR = Path(__file__).parent.parent / "data" / "pdfs"
 
 # Track processing status separately
 # Key: session_id

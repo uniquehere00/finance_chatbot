@@ -9,3 +9,9 @@ data/*.json
 *.index
 .DS_Store
 notebooks/
+backend/test_*.py
+backend/evaluate.py
+backend/ragas_score.py
+backend/ragas_scores.py
+backend/simple_eval.py
+backend/__pycache__/

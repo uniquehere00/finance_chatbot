@@ -15,3 +15,7 @@ backend/ragas_score.py
 backend/ragas_scores.py
 backend/simple_eval.py
 backend/__pycache__/
+render-build.sh
+Procfile
+render.yaml
+runtime.txt

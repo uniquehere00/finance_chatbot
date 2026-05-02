@@ -1,4 +1,5 @@
 import os
+import platform
 import json
 from pathlib import Path
 from typing import List, Dict
@@ -8,12 +9,6 @@ from unstructured.partition.pdf import partition_pdf
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from groq import Groq
 from dotenv import load_dotenv
-
-import platform
-import os
-
-import platform
-import os
 
 # Only import pytesseract if on Linux (Render server)
 # On Windows it's handled differently

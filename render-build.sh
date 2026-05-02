@@ -1,5 +1,2 @@
-#!/bin/bash
-set -e
-apt-get update -y
-apt-get install -y tesseract-ocr poppler-utils
+#!/usr/bin/env bash
 pip install -r backend/requirements.txt

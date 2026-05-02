@@ -24,7 +24,7 @@ if platform.system() == "Linux":
         os.environ["TESSDATA_PREFIX"] = "/usr/share/tesseract-ocr/4.00/tessdata"
     except ImportError:
         pass
-    
+
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
 
 def chunk_text(text: str, chunk_size: int = 500, chunk_overlap: int = 100) -> List[str]:
@@ -173,7 +173,7 @@ def process_pdf(pdf_path: str, groq_client: Groq) -> List[Dict]:
     
     elements = partition_pdf(
         filename=pdf_path,
-        strategy="hi_res",
+        strategy="auto",
         infer_table_structure=True
     )
     

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinSight — Financial Document Intelligence</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- UPLOAD SCREEN -->
+    <div id="upload-screen" class="screen active">
+        
+        <div class="hero">
+            <div class="logo">
+                <span class="logo-icon">📊</span>
+                <span class="logo-text">FinSight</span>
+            </div>
+            <h1>Financial Document Intelligence</h1>
+            <p class="subtitle">
+                Upload any financial document and query it 
+                in natural language. Powered by RAG + Groq.
+            </p>
+        </div>
+
+        <!-- Upload Box -->
+        <div class="upload-container">
+            <div 
+                class="upload-box" 
+                id="upload-box"
+                ondragover="handleDragOver(event)"
+                ondragleave="handleDragLeave(event)"
+                ondrop="handleDrop(event)"
+            >
+                <div class="upload-icon">📄</div>
+                <p class="upload-title">Drop your PDF here</p>
+                <p class="upload-subtitle">Annual reports, earnings releases, investor presentations</p>
+                <p class="upload-limit">Maximum 50MB · PDF only</p>
+                <input 
+                    type="file" 
+                    id="file-input" 
+                    accept=".pdf"
+                    onchange="handleFileSelect(event)"
+                    hidden
+                >
+                <button 
+                    class="btn btn-primary" 
+                    onclick="document.getElementById('file-input').click()"
+                >
+                    Choose File
+                </button>
+            </div>
+
+            <!-- Sample Documents -->
+            <div class="samples-section">
+                <p class="samples-label">Or try a sample document:</p>
+                <div class="samples-row" id="samples-row">
+                    <!-- Populated by JS -->
+                    <button 
+                        class="btn btn-sample" 
+                        onclick="loadSample('infosysy_press_release.pdf')"
+                    >
+                        📈 Infosys Q4 FY25
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Processing State -->
+        <div id="processing-state" class="processing hidden">
+            <div class="spinner"></div>
+            <p class="processing-title" id="processing-title">
+                Processing document...
+            </p>
+            <p class="processing-subtitle" id="processing-subtitle">
+                Extracting tables and text, building search index
+            </p>
+            <div class="progress-steps">
+                <div class="step" id="step-1">📄 Reading PDF</div>
+                <div class="step" id="step-2">🔍 Extracting content</div>
+                <div class="step" id="step-3">🧠 Building index</div>
+                <div class="step" id="step-4">✅ Ready</div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- CHAT SCREEN -->
+    <div id="chat-screen" class="screen hidden">
+        
+        <!-- Header -->
+        <div class="chat-header">
+            <div class="chat-header-left">
+                <span class="logo-small">📊 FinSight</span>
+                <div class="doc-info">
+                    <span class="doc-name" id="doc-name">document.pdf</span>
+                    <span class="doc-chunks" id="doc-chunks">0 chunks indexed</span>
+                </div>
+            </div>
+            <div class="chat-header-right">
+                <button class="btn btn-ghost" onclick="newConversation()">
+                    🔄 New Conversation
+                </button>
+                <button class="btn btn-ghost" onclick="uploadNew()">
+                    📤 Upload New
+                </button>
+            </div>
+        </div>
+
+        <!-- Chat Messages -->
+        <div class="chat-messages" id="chat-messages">
+            <div class="welcome-message">
+                <p>Document loaded. Ask me anything about it.</p>
+                <div class="suggestion-chips" id="suggestion-chips">
+                    <button class="chip" onclick="askSuggestion(this)">
+                        What was the revenue?
+                    </button>
+                    <button class="chip" onclick="askSuggestion(this)">
+                        What is the operating margin?
+                    </button>
+                    <button class="chip" onclick="askSuggestion(this)">
+                        Summarize key highlights
+                    </button>
+                    <button class="chip" onclick="askSuggestion(this)">
+                        What was the YoY growth?
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="chat-input-area">
+            <div class="input-row">
+                <textarea 
+                    id="question-input"
+                    placeholder="Ask anything about the document..."
+                    rows="1"
+                    onkeydown="handleKeyDown(event)"
+                    oninput="autoResize(this)"
+                ></textarea>
+                <button 
+                    class="send-btn" 
+                    id="send-btn"
+                    onclick="sendQuestion()"
+                >
+                    ➤
+                </button>
+            </div>
+            <p class="input-hint">Press Enter to send · Shift+Enter for new line</p>
+        </div>
+
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

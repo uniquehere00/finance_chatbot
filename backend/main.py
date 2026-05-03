@@ -9,6 +9,7 @@ from pathlib import Path
 
 from rag_pipeline import ask_session, create_session, delete_session
 from embeddings import load_index
+from typing import List  
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
 
@@ -85,51 +86,61 @@ async def health():
 @app.post("/upload")
 async def upload_document(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...)
+    files: List[UploadFile] = File(...)
 ):
     """
-    1. Validates and saves PDF
-    2. Returns session_id IMMEDIATELY
-    3. Processes PDF in background
-    4. Frontend polls /status/{session_id} until ready
+    Accepts multiple PDFs, processes all into one combined index.
+    Returns single session_id for querying across all documents.
     """
-    if not file.filename.endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported")
-    
-    contents = await file.read()
-    size_mb = len(contents) / (1024 * 1024)
-    
-    if size_mb > 50:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File too large: {size_mb:.1f}MB. Maximum is 50MB."
-        )
-    
-    # Generate session ID and save file
+    if not files:
+        raise HTTPException(status_code=400, detail="No files provided")
+
+    # Validate all files are PDFs
+    for file in files:
+        if not file.filename.endswith('.pdf'):
+            raise HTTPException(
+                status_code=400,
+                detail=f"{file.filename} is not a PDF"
+            )
+
     session_id = str(uuid.uuid4())[:8]
-    pdf_filename = f"{session_id}_{file.filename}"
-    pdf_path = UPLOAD_DIR / pdf_filename
-    
-    with open(pdf_path, 'wb') as f:
-        f.write(contents)
-    
-    print(f"PDF saved: {pdf_path} ({size_mb:.1f}MB)")
-    
-    # Mark as processing immediately
+    saved_paths = []
+
+    # Save all PDFs
+    for file in files:
+        contents = await file.read()
+        size_mb = len(contents) / (1024 * 1024)
+
+        if size_mb > 50:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{file.filename} too large: {size_mb:.1f}MB. Max 50MB."
+            )
+
+        pdf_filename = f"{session_id}_{file.filename}"
+        pdf_path = UPLOAD_DIR / pdf_filename
+
+        with open(pdf_path, 'wb') as f:
+            f.write(contents)
+
+        saved_paths.append(str(pdf_path))
+        print(f"Saved: {pdf_path} ({size_mb:.1f}MB)")
+
+    # Store pdf names for status response
+    pdf_names = [f.filename for f in files]
     processing_status[session_id] = "processing"
-    
-    # Add background task — runs AFTER this function returns
+
     background_tasks.add_task(
-        process_pdf_background,
+        process_multiple_pdfs_background,
         session_id,
-        str(pdf_path)
+        saved_paths,
+        pdf_names
     )
-    
-    # Return immediately — don't wait for processing
+
     return {
         "session_id": session_id,
-        "message": "Upload received, processing started",
-        "pdf_name": file.filename,
+        "message": f"Processing {len(files)} document(s)",
+        "pdf_names": pdf_names,
         "status": "processing"
     }
 
@@ -160,10 +171,12 @@ async def get_status(session_id: str):
     elif status == "ready":
         session = sessions.get(session_id, {})
         return {
-            "status": "ready",
-            "chunks_created": len(session.get("chunks", [])),
-            "pdf_name": session.get("pdf_name", "document.pdf")
+             "status": "ready",
+             "chunks_created": len(session.get("chunks", [])),
+             "pdf_name": session.get("pdf_name", "document.pdf"),
+             "pdf_count": session.get("pdf_count", 1)
         }
+    
     
     elif status.startswith("error:"):
         return {
@@ -311,6 +324,52 @@ async def debug_paths():
             "files": os.listdir(p) if path.exists() else []
         }
     return result
+
+def process_multiple_pdfs_background(
+    session_id: str,
+    pdf_paths: list,
+    pdf_names: list
+):
+    """Processes multiple PDFs into one combined FAISS index."""
+    try:
+        processing_status[session_id] = "processing"
+        print(f"Processing {len(pdf_paths)} PDFs for session {session_id}")
+
+        from document_processor import process_pdf
+        from embeddings import generate_embeddings, build_faiss_index
+
+        all_chunks = []
+
+        # Process each PDF
+        for pdf_path in pdf_paths:
+            chunks = process_pdf(pdf_path, groq_client)
+            all_chunks.extend(chunks)
+            print(f"Got {len(chunks)} chunks from {pdf_path}")
+
+        if not all_chunks:
+            processing_status[session_id] = "error:No content extracted"
+            return
+
+        # Build combined index
+        embeddings = generate_embeddings(all_chunks)
+        index = build_faiss_index(embeddings)
+
+        # Store session
+        from rag_pipeline import sessions
+        sessions[session_id] = {
+            "index": index,
+            "chunks": all_chunks,
+            "history": [],
+            "pdf_name": ", ".join(pdf_names),
+            "pdf_count": len(pdf_paths)
+        }
+
+        processing_status[session_id] = "ready"
+        print(f"Session {session_id} ready — {len(all_chunks)} total chunks from {len(pdf_paths)} PDFs")
+
+    except Exception as e:
+        processing_status[session_id] = f"error:{str(e)}"
+        print(f"Multi-PDF processing failed: {e}")
 
 if __name__ == "__main__":
     import uvicorn

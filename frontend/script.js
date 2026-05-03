@@ -51,14 +51,15 @@ function handleDragLeave(e) {
 function handleDrop(e) {
     e.preventDefault();
     document.getElementById("upload-box").classList.remove("dragover");
-    const file = e.dataTransfer.files[0];
-    if (file) uploadFile(file);
+    const files = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.pdf'));
+    if (files.length > 0) uploadFiles(files);
+    else alert("Please drop PDF files only.");
 }
 
 function handleFileSelect(e) {
-    console.log("File selected:", e.target.files[0]?.name);
-    const file = e.target.files[0];
-    if (file) uploadFile(file);
+    console.log("Files selected:", e.target.files.length);
+    const files = Array.from(e.target.files);
+    if (files.length > 0) uploadFiles(files);
 }
 
 function resetFileInput() {
@@ -66,20 +67,27 @@ function resetFileInput() {
 }
 
 // ===== UPLOAD =====
-async function uploadFile(file) {
-    console.log("Uploading:", file.name);
+
+async function uploadFiles(files) {
+    console.log("Uploading", files.length, "files");
     resetFileInput();
 
-    if (!file.name.endsWith(".pdf")) {
-        alert("Please upload a PDF file.");
+    // Validate all are PDFs
+    const nonPdfs = files.filter(f => !f.name.endsWith('.pdf'));
+    if (nonPdfs.length > 0) {
+        alert(`These are not PDFs: ${nonPdfs.map(f => f.name).join(', ')}`);
         return;
     }
 
-    showProcessing(`Uploading ${file.name}...`);
+    const label = files.length === 1
+        ? `Uploading ${files[0].name}...`
+        : `Uploading ${files.length} documents...`;
+
+    showProcessing(label);
     setStep(1);
 
     const formData = new FormData();
-    formData.append("file", file);
+    files.forEach(file => formData.append("files", file));
 
     try {
         const res = await fetch(`${API_URL}/upload`, {
@@ -96,7 +104,7 @@ async function uploadFile(file) {
         console.log("Upload response:", data);
         setStep(2);
 
-        await pollUntilReady(data.session_id, data.pdf_name);
+        await pollUntilReady(data.session_id, data.pdf_names.join(", "));
 
     } catch (err) {
         console.error("Upload error:", err);
@@ -170,7 +178,7 @@ async function pollUntilReady(sessionId, pdfName) {
             if (status.status === "ready") {
                 await sleep(500);
                 hideProcessing();
-                startChat(sessionId, status.pdf_name, status.chunks_created);
+                startChat(sessionId, status.pdf_name, status.chunks_created, status.pdf_count || 1);
                 return;
             }
 
@@ -192,18 +200,21 @@ async function pollUntilReady(sessionId, pdfName) {
 }
 
 // ===== START CHAT =====
-function startChat(sessionId, pdfName, chunksCreated) {
-    console.log("Starting chat:", sessionId, pdfName, chunksCreated);
+function startChat(sessionId, pdfName, chunksCreated, pdfCount) {
+    console.log("Starting chat:", sessionId);
     currentSessionId = sessionId;
 
-    // Update header
-    document.getElementById("doc-name").textContent = pdfName;
-    document.getElementById("doc-chunks").textContent = `${chunksCreated} chunks indexed`;
+    // Show multiple docs info if applicable
+    const displayName = pdfCount > 1
+        ? `${pdfCount} documents loaded`
+        : pdfName;
 
-    // Reset chat to welcome state
-    resetChatToWelcome();
+    document.getElementById("doc-name").textContent = displayName;
+    document.getElementById("doc-chunks").textContent =
+        `${chunksCreated} chunks indexed`;
 
-    // Switch screens
+    resetChatToWelcome(pdfCount);
+
     document.getElementById("upload-screen").classList.remove("active");
     document.getElementById("upload-screen").classList.add("hidden");
     document.getElementById("chat-screen").classList.remove("hidden");
@@ -213,15 +224,23 @@ function startChat(sessionId, pdfName, chunksCreated) {
 }
 
 // ===== RESET CHAT TO WELCOME =====
-function resetChatToWelcome() {
+function resetChatToWelcome(pdfCount = 1) {
+    const multiDocChips = pdfCount > 1
+        ? `<button class="chip" onclick="askSuggestion(this)">Compare revenue across documents</button>
+           <button class="chip" onclick="askSuggestion(this)">What are common risk factors?</button>`
+        : `<button class="chip" onclick="askSuggestion(this)">What was the revenue?</button>
+           <button class="chip" onclick="askSuggestion(this)">What is the operating margin?</button>`;
+
     document.getElementById("chat-messages").innerHTML = `
         <div class="chat-welcome" id="chat-welcome">
-            <div class="welcome-icon">💬</div>
-            <h3>Document ready</h3>
-            <p>Ask anything about the document. I'll answer with exact source citations.</p>
+            <div class="welcome-icon">${pdfCount > 1 ? '📚' : '💬'}</div>
+            <h3>${pdfCount > 1 ? `${pdfCount} documents ready` : 'Document ready'}</h3>
+            <p>${pdfCount > 1
+                ? 'Ask questions across all documents. I can compare and contrast information between them.'
+                : 'Ask anything about the document. I\'ll answer with exact source citations.'
+            }</p>
             <div class="suggestion-chips" id="suggestion-chips">
-                <button class="chip" onclick="askSuggestion(this)">What was the revenue?</button>
-                <button class="chip" onclick="askSuggestion(this)">What is the operating margin?</button>
+                ${multiDocChips}
                 <button class="chip" onclick="askSuggestion(this)">Summarize key highlights</button>
                 <button class="chip" onclick="askSuggestion(this)">What was the YoY growth?</button>
             </div>

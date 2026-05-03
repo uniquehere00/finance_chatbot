@@ -12,6 +12,35 @@ from embeddings import load_index
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
 
+
+# Copy PDFs from repo to Railway data directory at startup
+def setup_data_dirs():
+    # Find where our repo PDFs are
+    repo_pdfs = Path(__file__).parent / "data" / "pdfs"
+    repo_pdfs_alt = Path("/app/data/pdfs")
+    
+    # Target directory
+    target_pdfs = Path("/data/pdfs")
+    target_pdfs.mkdir(parents=True, exist_ok=True)
+    
+    Path("/data/uploads").mkdir(parents=True, exist_ok=True)
+    
+    # Copy PDFs from repo to /data/pdfs
+    source = repo_pdfs if repo_pdfs.exists() else repo_pdfs_alt
+    
+    if source.exists():
+        for pdf in source.glob("*.pdf"):
+            dest = target_pdfs / pdf.name
+            if not dest.exists():
+                shutil.copy2(str(pdf), str(dest))
+                print(f"Copied {pdf.name} to {target_pdfs}")
+    
+    print(f"PDFs in /data/pdfs: {list(target_pdfs.glob('*.pdf'))}")
+
+# Call at startup
+setup_data_dirs()
+
+
 app = FastAPI(title="Financial Document RAG API")
 
 app.add_middleware(
@@ -24,18 +53,15 @@ app.add_middleware(
 
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-
-# Detect if running on Railway
-if os.path.exists("/data/pdfs"):
+if Path("/data/pdfs").exists() and any(Path("/data/pdfs").glob("*.pdf")):
     SAMPLE_DIR = Path("/data/pdfs")
     UPLOAD_DIR = Path("/data/uploads")
 else:
-    # Local development
-    SAMPLE_DIR = Path(__file__).parent.parent / "data" / "pdfs"
-    UPLOAD_DIR = Path(__file__).parent.parent / "data" / "uploads"
+    SAMPLE_DIR = Path(__file__).parent / "data" / "pdfs"
+    UPLOAD_DIR = Path(__file__).parent / "data" / "uploads"
 
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-SAMPLE_DIR.mkdir(parents=True, exist_ok=True)
+
 
 # Track processing status separately
 # Key: session_id
@@ -305,16 +331,19 @@ async def debug_sessions():
 @app.get("/debug/paths")
 async def debug_paths():
     import os
-    sample_dir = Path(__file__).parent.parent / "data" / "pdfs"
-    return {
-        "sample_dir_str": str(sample_dir),
-        "sample_dir_exists": sample_dir.exists(),
-        "parent": str(Path(__file__).parent),
-        "parent_parent": str(Path(__file__).parent.parent),
-        "files_in_parent": os.listdir(Path(__file__).parent) if Path(__file__).parent.exists() else [],
-        "files_in_parent_parent": os.listdir(Path(__file__).parent.parent) if Path(__file__).parent.parent.exists() else [],
-    }
-
+    paths_to_check = [
+        "/data/pdfs",
+        "/app/data/pdfs", 
+        "/app/../data/pdfs",
+    ]
+    result = {}
+    for p in paths_to_check:
+        path = Path(p)
+        result[p] = {
+            "exists": path.exists(),
+            "files": os.listdir(p) if path.exists() else []
+        }
+    return result
 
 if __name__ == "__main__":
     import uvicorn

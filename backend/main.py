@@ -24,9 +24,18 @@ app.add_middleware(
 
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-SAMPLE_DIR = Path(__file__).parent.parent / "data" / "pdfs"
-UPLOAD_DIR = Path(__file__).parent.parent / "data" / "uploads"
+
+# Detect if running on Railway
+if os.path.exists("/data/pdfs"):
+    SAMPLE_DIR = Path("/data/pdfs")
+    UPLOAD_DIR = Path("/data/uploads")
+else:
+    # Local development
+    SAMPLE_DIR = Path(__file__).parent.parent / "data" / "pdfs"
+    UPLOAD_DIR = Path(__file__).parent.parent / "data" / "uploads"
+
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+SAMPLE_DIR.mkdir(parents=True, exist_ok=True)
 
 # Track processing status separately
 # Key: session_id
@@ -305,6 +314,7 @@ async def debug_paths():
         "files_in_parent": os.listdir(Path(__file__).parent) if Path(__file__).parent.exists() else [],
         "files_in_parent_parent": os.listdir(Path(__file__).parent.parent) if Path(__file__).parent.parent.exists() else [],
     }
+
 
 if __name__ == "__main__":
     import uvicorn

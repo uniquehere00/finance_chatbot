@@ -293,6 +293,18 @@ async def debug_sessions():
         "count": len(sessions)
     }
 
+@app.get("/debug/paths")
+async def debug_paths():
+    import os
+    sample_dir = Path(__file__).parent.parent / "data" / "pdfs"
+    return {
+        "sample_dir_str": str(sample_dir),
+        "sample_dir_exists": sample_dir.exists(),
+        "parent": str(Path(__file__).parent),
+        "parent_parent": str(Path(__file__).parent.parent),
+        "files_in_parent": os.listdir(Path(__file__).parent) if Path(__file__).parent.exists() else [],
+        "files_in_parent_parent": os.listdir(Path(__file__).parent.parent) if Path(__file__).parent.parent.exists() else [],
+    }
 
 if __name__ == "__main__":
     import uvicorn

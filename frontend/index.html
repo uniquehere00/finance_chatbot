@@ -3,83 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FinSight — Financial Document Intelligence</title>
+    <title>FinanceWithAI — Financial Document Intelligence</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
     <!-- UPLOAD SCREEN -->
     <div id="upload-screen" class="screen active">
-        
-        <div class="hero">
-            <div class="logo">
-                <span class="logo-icon">📊</span>
-                <span class="logo-text">FinSight</span>
+
+        <nav class="navbar">
+            <div class="nav-logo">
+                <span class="logo-mark">FS</span>
+                <span class="logo-name">FinSight</span>
             </div>
-            <h1>Financial Document Intelligence</h1>
-            <p class="subtitle">
-                Upload any financial document and query it 
-                in natural language. Powered by RAG + Groq.
-            </p>
+            <span class="nav-tagline">Financial Document Intelligence</span>
+        </nav>
+
+        <div class="upload-hero">
+            <div class="hero-badge">Powered by RAG + Groq LLM</div>
+            <h1>Ask anything about<br>any financial document</h1>
+            <p class="hero-sub">Upload annual reports, earnings releases, or investor presentations. Get instant, cited answers.</p>
         </div>
 
-        <!-- Upload Box -->
-        <div class="upload-container">
-            <div 
-                class="upload-box" 
+        <!-- How it works -->
+        <div class="steps-row">
+            <div class="step-item">
+                <div class="step-num">01</div>
+                <div class="step-text">Upload your PDF</div>
+            </div>
+            <div class="step-divider">→</div>
+            <div class="step-item">
+                <div class="step-num">02</div>
+                <div class="step-text">We index it instantly</div>
+            </div>
+            <div class="step-divider">→</div>
+            <div class="step-item">
+                <div class="step-num">03</div>
+                <div class="step-text">Ask questions freely</div>
+            </div>
+        </div>
+
+        <!-- Upload Zone -->
+        <div class="upload-zone-wrapper">
+            <div
+                class="upload-zone"
                 id="upload-box"
                 ondragover="handleDragOver(event)"
                 ondragleave="handleDragLeave(event)"
                 ondrop="handleDrop(event)"
+                onclick="document.getElementById('file-input').click()"
             >
-                <div class="upload-icon">📄</div>
-                <p class="upload-title">Drop your PDF here</p>
-                <p class="upload-subtitle">Annual reports, earnings releases, investor presentations</p>
-                <p class="upload-limit">Maximum 50MB · PDF only</p>
-                <input 
-                    type="file" 
-                    id="file-input" 
-                    accept=".pdf"
-                    onchange="handleFileSelect(event)"
-                    hidden
-                >
-                <button 
-                    class="btn btn-primary" 
-                    onclick="document.getElementById('file-input').click()"
-                >
-                    Choose File
-                </button>
+                <div class="upload-zone-inner">
+                    <div class="upload-icon-wrap">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="12" y1="18" x2="12" y2="12"/>
+                            <line x1="9" y1="15" x2="15" y2="15"/>
+                        </svg>
+                    </div>
+                    <p class="upload-main-text">Drop your PDF here or <span class="upload-link">browse files</span></p>
+                    <p class="upload-sub-text">Annual reports · Earnings releases · Investor presentations · Max 50MB</p>
+                </div>
+                <input type="file" id="file-input" accept=".pdf" onchange="handleFileSelect(event)" hidden>
             </div>
 
             <!-- Sample Documents -->
             <div class="samples-section">
-                <p class="samples-label">Or try a sample document:</p>
+                <div class="samples-label">
+                    <span class="samples-line"></span>
+                    <span>or try a sample</span>
+                    <span class="samples-line"></span>
+                </div>
                 <div class="samples-row" id="samples-row">
-                    <!-- Populated by JS -->
-                    <button 
-                        class="btn btn-sample" 
-                        onclick="loadSample('infosysy_press_release.pdf')"
-                    >
-                        📈 Infosys Q4 FY25
+                    <button class="sample-btn" onclick="loadSample('infosysy_press_release.pdf')">
+                        <span class="sample-icon">📊</span>
+                        <div class="sample-info">
+                            <span class="sample-name">Infosys Q4 FY25</span>
+                            <span class="sample-type">Earnings Release</span>
+                        </div>
                     </button>
                 </div>
             </div>
         </div>
 
         <!-- Processing State -->
-        <div id="processing-state" class="processing hidden">
-            <div class="spinner"></div>
-            <p class="processing-title" id="processing-title">
-                Processing document...
-            </p>
-            <p class="processing-subtitle" id="processing-subtitle">
-                Extracting tables and text, building search index
-            </p>
-            <div class="progress-steps">
-                <div class="step" id="step-1">📄 Reading PDF</div>
-                <div class="step" id="step-2">🔍 Extracting content</div>
-                <div class="step" id="step-3">🧠 Building index</div>
-                <div class="step" id="step-4">✅ Ready</div>
+        <div id="processing-state" class="processing-overlay hidden">
+            <div class="processing-card">
+                <div class="processing-spinner"></div>
+                <p class="processing-title" id="processing-title">Uploading document...</p>
+                <p class="processing-sub" id="processing-subtitle">This takes about 30-60 seconds</p>
+                <div class="processing-steps">
+                    <div class="proc-step" id="step-1">
+                        <span class="proc-dot"></span>
+                        <span>Reading PDF</span>
+                    </div>
+                    <div class="proc-step" id="step-2">
+                        <span class="proc-dot"></span>
+                        <span>Extracting content</span>
+                    </div>
+                    <div class="proc-step" id="step-3">
+                        <span class="proc-dot"></span>
+                        <span>Building search index</span>
+                    </div>
+                    <div class="proc-step" id="step-4">
+                        <span class="proc-dot"></span>
+                        <span>Ready</span>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -87,70 +120,78 @@
 
     <!-- CHAT SCREEN -->
     <div id="chat-screen" class="screen hidden">
-        
-        <!-- Header -->
+
         <div class="chat-header">
             <div class="chat-header-left">
-                <span class="logo-small">📊 FinSight</span>
-                <div class="doc-info">
-                    <span class="doc-name" id="doc-name">document.pdf</span>
-                    <span class="doc-chunks" id="doc-chunks">0 chunks indexed</span>
+                <button class="back-btn" onclick="uploadNew()" title="Upload new document">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="19" y1="12" x2="5" y2="12"/>
+                        <polyline points="12 19 5 12 12 5"/>
+                    </svg>
+                </button>
+                <div class="doc-pill">
+                    <span class="doc-pill-icon">📄</span>
+                    <div class="doc-pill-info">
+                        <span class="doc-pill-name" id="doc-name">document.pdf</span>
+                        <span class="doc-pill-chunks" id="doc-chunks">indexing...</span>
+                    </div>
                 </div>
             </div>
             <div class="chat-header-right">
-                <button class="btn btn-ghost" onclick="newConversation()">
-                    🔄 New Conversation
+                <button class="header-btn" onclick="newConversation()" title="Start fresh conversation">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="1 4 1 10 7 10"/>
+                        <path d="M3.51 15a9 9 0 1 0 .49-3.51"/>
+                    </svg>
+                    New Chat
                 </button>
-                <button class="btn btn-ghost" onclick="uploadNew()">
-                    📤 Upload New
+                <button class="header-btn" onclick="uploadNew()" title="Upload different document">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    Upload New
                 </button>
             </div>
         </div>
 
-        <!-- Chat Messages -->
         <div class="chat-messages" id="chat-messages">
-            <div class="welcome-message">
-                <p>Document loaded. Ask me anything about it.</p>
+            <!-- Welcome state -->
+            <div class="chat-welcome" id="chat-welcome">
+                <div class="welcome-icon">💬</div>
+                <h3>Document ready</h3>
+                <p>Ask anything about the document. I'll answer with exact source citations.</p>
                 <div class="suggestion-chips" id="suggestion-chips">
-                    <button class="chip" onclick="askSuggestion(this)">
-                        What was the revenue?
-                    </button>
-                    <button class="chip" onclick="askSuggestion(this)">
-                        What is the operating margin?
-                    </button>
-                    <button class="chip" onclick="askSuggestion(this)">
-                        Summarize key highlights
-                    </button>
-                    <button class="chip" onclick="askSuggestion(this)">
-                        What was the YoY growth?
-                    </button>
+                    <button class="chip" onclick="askSuggestion(this)">What was the revenue?</button>
+                    <button class="chip" onclick="askSuggestion(this)">What is the operating margin?</button>
+                    <button class="chip" onclick="askSuggestion(this)">Summarize key highlights</button>
+                    <button class="chip" onclick="askSuggestion(this)">What was the YoY growth?</button>
                 </div>
             </div>
         </div>
 
-        <!-- Input Area -->
         <div class="chat-input-area">
-            <div class="input-row">
-                <textarea 
+            <div class="input-wrap">
+                <textarea
                     id="question-input"
                     placeholder="Ask anything about the document..."
                     rows="1"
                     onkeydown="handleKeyDown(event)"
                     oninput="autoResize(this)"
                 ></textarea>
-                <button 
-                    class="send-btn" 
-                    id="send-btn"
-                    onclick="sendQuestion()"
-                >
-                    ➤
+                <button class="send-btn" id="send-btn" onclick="sendQuestion()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="22" y1="2" x2="11" y2="13"/>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                    </svg>
                 </button>
             </div>
-            <p class="input-hint">Press Enter to send · Shift+Enter for new line</p>
+            <p class="input-hint">Enter to send · Shift+Enter for new line · Answers include page citations</p>
         </div>
 
     </div>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=5"></script>
 </body>
 </html>

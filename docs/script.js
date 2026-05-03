@@ -1,14 +1,17 @@
-console.log("script.js v3 loaded");
+console.log("FinSight v5 loaded");
 
 const API_URL = "https://web-production-bf42a.up.railway.app";
 let currentSessionId = null;
 let isProcessing = false;
 
+// ===== INIT =====
 window.onload = async () => {
-    console.log("Page loaded");
+    // Warm up backend silently
+    fetch(`${API_URL}/health`).catch(() => {});
     await loadSampleButtons();
 };
 
+// ===== LOAD SAMPLE BUTTONS =====
 async function loadSampleButtons() {
     try {
         const res = await fetch(`${API_URL}/samples`);
@@ -18,8 +21,14 @@ async function loadSampleButtons() {
             row.innerHTML = "";
             data.samples.forEach(sample => {
                 const btn = document.createElement("button");
-                btn.className = "btn btn-sample";
-                btn.textContent = `📈 ${sample.display_name}`;
+                btn.className = "sample-btn";
+                btn.innerHTML = `
+                    <span class="sample-icon">📊</span>
+                    <div class="sample-info">
+                        <span class="sample-name">${sample.display_name}</span>
+                        <span class="sample-type">Earnings Release · ${sample.size_mb}MB</span>
+                    </div>
+                `;
                 btn.onclick = () => loadSample(sample.filename);
                 row.appendChild(btn);
             });
@@ -29,6 +38,7 @@ async function loadSampleButtons() {
     }
 }
 
+// ===== DRAG AND DROP =====
 function handleDragOver(e) {
     e.preventDefault();
     document.getElementById("upload-box").classList.add("dragover");
@@ -46,9 +56,8 @@ function handleDrop(e) {
 }
 
 function handleFileSelect(e) {
-    console.log("handleFileSelect triggered");
+    console.log("File selected:", e.target.files[0]?.name);
     const file = e.target.files[0];
-    console.log("File:", file?.name);
     if (file) uploadFile(file);
 }
 
@@ -56,8 +65,9 @@ function resetFileInput() {
     document.getElementById("file-input").value = "";
 }
 
+// ===== UPLOAD =====
 async function uploadFile(file) {
-    console.log("uploadFile called:", file.name);
+    console.log("Uploading:", file.name);
     resetFileInput();
 
     if (!file.name.endsWith(".pdf")) {
@@ -72,13 +82,10 @@ async function uploadFile(file) {
     formData.append("file", file);
 
     try {
-        console.log("Sending upload request...");
         const res = await fetch(`${API_URL}/upload`, {
             method: "POST",
             body: formData
         });
-
-        console.log("Upload response status:", res.status);
 
         if (!res.ok) {
             const err = await res.json();
@@ -86,7 +93,7 @@ async function uploadFile(file) {
         }
 
         const data = await res.json();
-        console.log("Upload data:", data);
+        console.log("Upload response:", data);
         setStep(2);
 
         await pollUntilReady(data.session_id, data.pdf_name);
@@ -98,8 +105,9 @@ async function uploadFile(file) {
     }
 }
 
+// ===== LOAD SAMPLE =====
 async function loadSample(filename) {
-    console.log("loadSample called:", filename);
+    console.log("Loading sample:", filename);
     showProcessing(`Loading sample document...`);
     setStep(1);
 
@@ -128,6 +136,7 @@ async function loadSample(filename) {
     }
 }
 
+// ===== POLL UNTIL READY =====
 async function pollUntilReady(sessionId, pdfName) {
     console.log("Polling session:", sessionId);
 
@@ -135,11 +144,11 @@ async function pollUntilReady(sessionId, pdfName) {
     let attempts = 0;
 
     const messages = [
-        "Extracting content from PDF...",
-        "Detecting tables and text...",
+        "Reading PDF pages...",
+        "Extracting text and tables...",
         "Converting tables to natural language...",
-        "Generating embeddings...",
-        "Building search index...",
+        "Generating semantic embeddings...",
+        "Building FAISS search index...",
         "Almost ready..."
     ];
 
@@ -147,11 +156,11 @@ async function pollUntilReady(sessionId, pdfName) {
         await sleep(3000);
         attempts++;
 
-        const msgIndex = Math.min(Math.floor(attempts / 4), messages.length - 1);
+        const msgIndex = Math.min(Math.floor(attempts / 3), messages.length - 1);
         document.getElementById("processing-title").textContent = messages[msgIndex];
 
         if (attempts > 2) setStep(3);
-        if (attempts > 6) setStep(4);
+        if (attempts > 5) setStep(4);
 
         try {
             const res = await fetch(`${API_URL}/status/${sessionId}`);
@@ -159,8 +168,8 @@ async function pollUntilReady(sessionId, pdfName) {
             console.log(`Poll ${attempts}:`, status.status);
 
             if (status.status === "ready") {
-                console.log("Ready! Starting chat...");
                 await sleep(500);
+                hideProcessing();
                 startChat(sessionId, status.pdf_name, status.chunks_created);
                 return;
             }
@@ -170,22 +179,31 @@ async function pollUntilReady(sessionId, pdfName) {
             }
 
         } catch (err) {
-            if (err.message.includes("Processing failed")) throw err;
-            console.log("Poll network error, retrying:", err.message);
+            if (err.message !== "Processing failed") {
+                console.log("Poll retry:", err.message);
+                continue;
+            }
+            throw err;
         }
     }
 
-    throw new Error("Processing timed out. Try a smaller PDF.");
+    hideProcessing();
+    alert("Processing timed out. Please try a smaller PDF.");
 }
 
+// ===== START CHAT =====
 function startChat(sessionId, pdfName, chunksCreated) {
-    console.log("startChat called:", sessionId, pdfName, chunksCreated);
+    console.log("Starting chat:", sessionId, pdfName, chunksCreated);
     currentSessionId = sessionId;
 
+    // Update header
     document.getElementById("doc-name").textContent = pdfName;
-    document.getElementById("doc-chunks").textContent =
-        `${chunksCreated} chunks indexed`;
+    document.getElementById("doc-chunks").textContent = `${chunksCreated} chunks indexed`;
 
+    // Reset chat to welcome state
+    resetChatToWelcome();
+
+    // Switch screens
     document.getElementById("upload-screen").classList.remove("active");
     document.getElementById("upload-screen").classList.add("hidden");
     document.getElementById("chat-screen").classList.remove("hidden");
@@ -194,6 +212,24 @@ function startChat(sessionId, pdfName, chunksCreated) {
     document.getElementById("question-input").focus();
 }
 
+// ===== RESET CHAT TO WELCOME =====
+function resetChatToWelcome() {
+    document.getElementById("chat-messages").innerHTML = `
+        <div class="chat-welcome" id="chat-welcome">
+            <div class="welcome-icon">💬</div>
+            <h3>Document ready</h3>
+            <p>Ask anything about the document. I'll answer with exact source citations.</p>
+            <div class="suggestion-chips" id="suggestion-chips">
+                <button class="chip" onclick="askSuggestion(this)">What was the revenue?</button>
+                <button class="chip" onclick="askSuggestion(this)">What is the operating margin?</button>
+                <button class="chip" onclick="askSuggestion(this)">Summarize key highlights</button>
+                <button class="chip" onclick="askSuggestion(this)">What was the YoY growth?</button>
+            </div>
+        </div>
+    `;
+}
+
+// ===== SEND QUESTION =====
 async function sendQuestion() {
     console.log("Sending with session:", currentSessionId);
     if (isProcessing) return;
@@ -207,11 +243,12 @@ async function sendQuestion() {
         return;
     }
 
+    // Remove welcome state on first question
+    const welcome = document.getElementById("chat-welcome");
+    if (welcome) welcome.remove();
+
     input.value = "";
     autoResize(input);
-
-    const chips = document.getElementById("suggestion-chips");
-    if (chips) chips.style.display = "none";
 
     addMessage("user", question);
     const thinkingId = showThinking();
@@ -248,6 +285,7 @@ async function sendQuestion() {
     }
 }
 
+// ===== ADD MESSAGES =====
 function addMessage(role, text) {
     const container = document.getElementById("chat-messages");
     const msg = document.createElement("div");
@@ -273,8 +311,7 @@ function addBotMessage(answer, sources) {
     if (sources && sources.length > 0) {
         const toggleBtn = document.createElement("button");
         toggleBtn.className = "sources-toggle";
-        toggleBtn.textContent =
-            `📎 ${sources.length} sources retrieved · Click to view`;
+        toggleBtn.innerHTML = `📎 ${sources.length} sources · click to view`;
 
         const sourcesList = document.createElement("div");
         sourcesList.className = "sources-list";
@@ -284,12 +321,8 @@ function addBotMessage(answer, sources) {
             item.className = "source-item";
             item.innerHTML = `
                 <div class="source-header">
-                    <span class="source-label">
-                        Source ${source.rank} · ${source.source} · Page ${source.page || "N/A"}
-                    </span>
-                    <span class="source-score">
-                        ${(source.similarity * 100).toFixed(0)}% match
-                    </span>
+                    <span class="source-label">Source ${source.rank} · Page ${source.page || "N/A"}</span>
+                    <span class="source-score">${(source.similarity * 100).toFixed(0)}% match</span>
                 </div>
                 <div class="source-preview">${source.preview}</div>
             `;
@@ -298,9 +331,9 @@ function addBotMessage(answer, sources) {
 
         toggleBtn.onclick = () => {
             sourcesList.classList.toggle("visible");
-            toggleBtn.textContent = sourcesList.classList.contains("visible")
-                ? `📎 ${sources.length} sources retrieved · Click to hide`
-                : `📎 ${sources.length} sources retrieved · Click to view`;
+            toggleBtn.innerHTML = sourcesList.classList.contains("visible")
+                ? `📎 ${sources.length} sources · click to hide`
+                : `📎 ${sources.length} sources · click to view`;
         };
 
         msg.appendChild(toggleBtn);
@@ -311,6 +344,7 @@ function addBotMessage(answer, sources) {
     scrollToBottom();
 }
 
+// ===== THINKING =====
 function showThinking() {
     const container = document.getElementById("chat-messages");
     const id = "thinking-" + Date.now();
@@ -331,11 +365,13 @@ function removeThinking(id) {
     if (el) el.remove();
 }
 
+// ===== SUGGESTIONS =====
 function askSuggestion(btn) {
     document.getElementById("question-input").value = btn.textContent.trim();
     sendQuestion();
 }
 
+// ===== KEYBOARD =====
 function handleKeyDown(e) {
     if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
@@ -343,19 +379,20 @@ function handleKeyDown(e) {
     }
 }
 
+// ===== TEXTAREA RESIZE =====
 function autoResize(el) {
     el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 200) + "px";
+    el.style.height = Math.min(el.scrollHeight, 160) + "px";
 }
 
+// ===== PROCESSING UI =====
 function showProcessing(title) {
-    document.querySelector(".upload-container").classList.add("hidden");
     document.getElementById("processing-state").classList.remove("hidden");
     document.getElementById("processing-title").textContent = title;
+    resetSteps();
 }
 
 function hideProcessing() {
-    document.querySelector(".upload-container").classList.remove("hidden");
     document.getElementById("processing-state").classList.add("hidden");
     resetSteps();
 }
@@ -363,47 +400,51 @@ function hideProcessing() {
 function setStep(n) {
     for (let i = 1; i <= 4; i++) {
         const step = document.getElementById(`step-${i}`);
-        if (i < n) step.className = "step done";
-        else if (i === n) step.className = "step active";
-        else step.className = "step";
+        if (i < n) step.className = "proc-step done";
+        else if (i === n) step.className = "proc-step active";
+        else step.className = "proc-step";
     }
 }
 
 function resetSteps() {
     for (let i = 1; i <= 4; i++) {
-        document.getElementById(`step-${i}`).className = "step";
+        document.getElementById(`step-${i}`).className = "proc-step";
     }
 }
 
+// ===== NAVIGATION — BUG FIXES HERE =====
 function newConversation() {
     if (!currentSessionId) return;
+
+    // Reset memory on server
     fetch(`${API_URL}/reset/${currentSessionId}`, { method: "POST" });
-    document.getElementById("chat-messages").innerHTML = `
-        <div class="welcome-message">
-            <p>Conversation reset. Ask me anything about the document.</p>
-            <div class="suggestion-chips" id="suggestion-chips">
-                <button class="chip" onclick="askSuggestion(this)">What was the revenue?</button>
-                <button class="chip" onclick="askSuggestion(this)">What is the operating margin?</button>
-                <button class="chip" onclick="askSuggestion(this)">Summarize key highlights</button>
-                <button class="chip" onclick="askSuggestion(this)">What was the YoY growth?</button>
-            </div>
-        </div>
-    `;
+
+    // Reset chat to welcome — NOT "conversation reset" message
+    resetChatToWelcome();
 }
 
 function uploadNew() {
+    // Close current session on server
     if (currentSessionId) {
         fetch(`${API_URL}/session/${currentSessionId}`, { method: "DELETE" });
         currentSessionId = null;
     }
+
+    // ===== FIX: Clear header info =====
+    document.getElementById("doc-name").textContent = "";
+    document.getElementById("doc-chunks").textContent = "";
+
+    // Switch back to upload screen
     document.getElementById("chat-screen").classList.add("hidden");
     document.getElementById("chat-screen").classList.remove("active");
     document.getElementById("upload-screen").classList.remove("hidden");
     document.getElementById("upload-screen").classList.add("active");
+
     hideProcessing();
     resetFileInput();
 }
 
+// ===== UTILS =====
 function scrollToBottom() {
     const container = document.getElementById("chat-messages");
     container.scrollTop = container.scrollHeight;

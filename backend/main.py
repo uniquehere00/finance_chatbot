@@ -13,34 +13,6 @@ from embeddings import load_index
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
 
 
-# Copy PDFs from repo to Railway data directory at startup
-def setup_data_dirs():
-    # Find where our repo PDFs are
-    repo_pdfs = Path(__file__).parent / "data" / "pdfs"
-    repo_pdfs_alt = Path("/app/data/pdfs")
-    
-    # Target directory
-    target_pdfs = Path("/data/pdfs")
-    target_pdfs.mkdir(parents=True, exist_ok=True)
-    
-    Path("/data/uploads").mkdir(parents=True, exist_ok=True)
-    
-    # Copy PDFs from repo to /data/pdfs
-    source = repo_pdfs if repo_pdfs.exists() else repo_pdfs_alt
-    
-    if source.exists():
-        for pdf in source.glob("*.pdf"):
-            dest = target_pdfs / pdf.name
-            if not dest.exists():
-                shutil.copy2(str(pdf), str(dest))
-                print(f"Copied {pdf.name} to {target_pdfs}")
-    
-    print(f"PDFs in /data/pdfs: {list(target_pdfs.glob('*.pdf'))}")
-
-# Call at startup
-setup_data_dirs()
-
-
 app = FastAPI(title="Financial Document RAG API")
 
 app.add_middleware(
@@ -53,15 +25,10 @@ app.add_middleware(
 
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-if Path("/data/pdfs").exists() and any(Path("/data/pdfs").glob("*.pdf")):
-    SAMPLE_DIR = Path("/data/pdfs")
-    UPLOAD_DIR = Path("/data/uploads")
-else:
-    SAMPLE_DIR = Path(__file__).parent / "data" / "pdfs"
-    UPLOAD_DIR = Path(__file__).parent / "data" / "uploads"
-
+SAMPLE_DIR = Path(__file__).parent / "data" / "pdfs"
+UPLOAD_DIR = Path(__file__).parent / "data" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
+SAMPLE_DIR.mkdir(parents=True, exist_ok=True)
 
 # Track processing status separately
 # Key: session_id
